@@ -41,9 +41,10 @@ public final class BlindSense3DEngine: ObservableObject {
     private var continuousPlayer: CHHapticAdvancedPatternPlayer?
     private var isHapticsSupported: Bool = false
     
+    private var isSpatialConfigured: Bool = false
+    
     public init() {
         setupHaptics()
-        setupSpatialAudioEnvironment()
     }
     
     deinit {
@@ -130,6 +131,11 @@ public final class BlindSense3DEngine: ObservableObject {
     public func start() {
         guard !isActive else { return }
         isActive = true
+        
+        if !isSpatialConfigured {
+            setupSpatialAudioEnvironment()
+            isSpatialConfigured = true
+        }
         
         do {
             try spatialEngine.start()

@@ -15,7 +15,9 @@ struct ProjectMurdockApp: App {
                 .onAppear {
                     // Prevent screen sleep during sensory surveillance
                     UIApplication.shared.isIdleTimerDisabled = true
-                    coordinator.startAllEngines()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        coordinator.startAllEngines()
+                    }
                 }
                 .onDisappear {
                     UIApplication.shared.isIdleTimerDisabled = false
@@ -24,7 +26,9 @@ struct ProjectMurdockApp: App {
                 .onChange(of: scenePhase) { _, newPhase in
                     switch newPhase {
                     case .active:
-                        coordinator.startAllEngines()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            coordinator.startAllEngines()
+                        }
                     case .background, .inactive:
                         coordinator.stopAllEngines()
                     @unknown default:

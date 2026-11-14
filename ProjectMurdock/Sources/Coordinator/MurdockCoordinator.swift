@@ -57,8 +57,13 @@ public final class MurdockCoordinator: ObservableObject {
         setupInterEngineWiring()
     }
     
+    private var isRunning: Bool = false
+    
     // MARK: - System Lifecycle
     public func startAllEngines() {
+        guard !isRunning else { return }
+        isRunning = true
+        
         visionEngine.startEngine()
         audioEngine.start()
         seismicEngine.start()
@@ -67,6 +72,9 @@ public final class MurdockCoordinator: ObservableObject {
     }
     
     public func stopAllEngines() {
+        guard isRunning else { return }
+        isRunning = false
+        
         visionEngine.stopEngine()
         audioEngine.stop()
         seismicEngine.stop()

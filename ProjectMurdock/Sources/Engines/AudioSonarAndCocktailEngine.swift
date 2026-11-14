@@ -73,19 +73,25 @@ public final class AudioSonarAndCocktailEngine: ObservableObject {
     
     // MARK: - Lifecycle & Audio Session Setup
     public func start() {
-        configureAudioSession()
-        setupAudioGraph()
-        
-        do {
-            try audioEngine.start()
-            isSonarTransmitting = true
-        } catch {
-            print("[AudioSonar] Failed to start AVAudioEngine: \(error.localizedDescription)")
+        AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+            guard granted, let self = self else { return }
+            DispatchQueue.main.async {
+                self.configureAudioSession()
+                self.setupAudioGraph()
+                do {
+                    try self.audioEngine.start()
+                    self.isSonarTransmitting = true
+                } catch {
+                    print("[AudioSonar] Failed to start AVAudioEngine: \(error.localizedDescription)")
+                }
+            }
         }
     }
     
     public func stop() {
-        audioEngine.stop()
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
         audioEngine.inputNode.removeTap(onBus: 0)
         isSonarTransmitting = false
     }
@@ -120,7 +126,6 @@ public final class AudioSonarAndCocktailEngine: ObservableObject {
     private func setupAudioGraph() {
         let mainMixer = audioEngine.mainMixerNode
         let inputNode = audioEngine.inputNode
-        let outputNode = audioEngine.outputNode
         
         // 1. Ultrasonic Tone Generator Node (19.5 kHz Sine)
         let twoPi = 2.0 * Float.pi
@@ -150,35 +155,13 @@ public final class AudioSonarAndCocktailEngine: ObservableObject {
             audioEngine.connect(source, to: mainMixer, format: format)
         }
         
-        // 2. Cocktail Party Voice Bandpass EQ (300 Hz - 3200 Hz)
-        let eq = AVAudioUnitEQ(numberOfBands: 3)
-        // High-pass at 300 Hz
-        eq.bands[0].filterType = .highPass
-        eq.bands[0].frequency = 300.0
-        eq.bands[0].bypass = false
-        // Low-pass at 3200 Hz
-        eq.bands[1].filterType = .lowPass
-        eq.bands[1].frequency = 3200.0
-        eq.bands[1].bypass = false
-        // Speech Presence Boost at 2000 Hz (+6 dB)
-        eq.bands[2].filterType = .parametric
-        eq.bands[2].frequency = 2000.0
-        eq.bands[2].bandwidth = 1.0
-        eq.bands[2].gain = 6.0
-        eq.bands[2].bypass = false
+        // 2. Audio Tap on Input Node for 4096-sample vDSP FFT
+        // Install tap directly on input bus with native hardware format
+        let nativeFormat = inputNode.inputFormat(forBus: 0)
+        let tapFormat = (nativeFormat.sampleRate > 0 && nativeFormat.channelCount > 0) ? nativeFormat : nil
         
-        self.cocktailEQ = eq
-        audioEngine.attach(eq)
-        
-        let inputFormat = inputNode.outputFormat(forBus: 0)
-        audioEngine.connect(inputNode, to: eq, format: inputFormat)
-        audioEngine.connect(eq, to: outputNode, format: inputFormat)
-        
-        // Set initial cocktail pass bypass based on mode
-        eq.bypass = !isCocktailZoomActive
-        
-        // 3. Audio Tap on Input Node for 4096-sample vDSP FFT
-        inputNode.installTap(onBus: 0, bufferSize: AVAudioFrameCount(fftSize), format: inputFormat) { [weak self] buffer, _ in
+        inputNode.removeTap(onBus: 0)
+        inputNode.installTap(onBus: 0, bufferSize: AVAudioFrameCount(fftSize), format: tapFormat) { [weak self] buffer, _ in
             self?.processInputAudioBuffer(buffer: buffer)
         }
     }

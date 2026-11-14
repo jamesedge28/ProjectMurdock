@@ -123,10 +123,15 @@ public final class MetalVisionAndLiDAREngine: NSObject, ObservableObject, MTKVie
     
     // MARK: - Session Control
     public func startEngine() {
-        if isLiDARAvailable {
-            startARKitSession()
-        } else {
-            startAVCaptureFallback()
+        AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+            guard granted, let self = self else { return }
+            DispatchQueue.main.async {
+                if self.isLiDARAvailable {
+                    self.startARKitSession()
+                } else {
+                    self.startAVCaptureFallback()
+                }
+            }
         }
     }
     
